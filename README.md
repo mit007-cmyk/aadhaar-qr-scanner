@@ -1,62 +1,78 @@
-# Aadhaar QR Scanner (on-device)
+# Aadhaar QR Scanner (On-Device Offline)
 
-Flutter app that decodes Aadhaar QR **on the phone** — no Python API required.
+A Flutter application designed to scan and decode both **Legacy (XML)** and **Modern (Secure Binary)** Aadhaar QR codes entirely on-device offline. No Python server or network requests are required to read, parse, and verify the biometric data.
 
-## QR scanning
+---
 
-Uses **Google ML Kit** via `mobile_scanner` (not `flutter_zxing`) to read QR bytes from camera/gallery.
-The Aadhaar field parsing logic is ported to Dart under `lib/aadhaar_qr/`.
+## 📱 Features
 
-## Can I put Python (`qr_decode.py`) inside Flutter?
+- **On-Device Live Scanning**: Uses **Google ML Kit Barcode API** (`mobile_scanner`) to capture raw binary payloads directly from live camera frames.
+- **Decompression & Parsing**: Pure Dart implementation (`lib/aadhaar_qr/`) to handle raw bytes decompression (Zlib/GZip) and binary segment parsing.
+- **Native JPEG 2000 Decryption & Transcoding**: Seamlessly decodes heavily compressed biometric photos (`image/jp2`) using a native Kotlin/C++ MethodChannel bridge.
+- **Clean Details Presentation**: Displays card-based details with dedicated verification badges (e-Signature status), and auto-fallbacks (`-`) for missing or null fields.
+- **Console Log Output**: Outputs formatted, pretty-printed JSON logs in the debug terminal with truncated base64 image data to avoid cluttering.
 
-**No — not in a simple way.** Flutter runs Dart; Android/iOS do not ship a Python interpreter.
+---
 
-| Approach | Works on phone? | Notes |
-|----------|-----------------|-------|
-| Drop `qr_decode.py` in Flutter project | ❌ | Dart cannot execute `.py` files |
-| Chaquopy (embed Python on Android) | ⚠️ Android only | Large APK, complex, still no iOS |
-| Call Python API over network | ✅ | What the HTML demo does |
-| Port parser to Dart (this app) | ✅ | Already done in `lib/aadhaar_qr/` |
-| ML Kit for QR + Dart parser | ✅ | **Current approach** |
+## ⚙️ Architecture & Technical Flow
 
-The Python **payload parser** (~500 lines) is already in Dart. Only the heavy OpenCV/YOLO **image pipeline** from `qr_decode.py` was replaced by ML Kit.
+```
+[Live Camera Frame]
+       │ (Google ML Kit Native Thread)
+       ▼
+[Raw Byte Stream (Compressed Aadhaar Data)]
+       │ (Dart zlib/gzip Decompressor)
+       ▼
+[Parsed Aadhaar Data Model] 
+       │ (MIME Check: image/jp2)
+       ▼ (MethodChannel: /jp2_decoder)
+[Native Android OpenJPEG Engine (Kotlin/C++)] ──► Converts JP2 to PNG
+       │
+       ▼ (PNG Bytes)
+[Flutter UI Widget (Image.memory)]
+```
 
-| Python (server) | Dart (Flutter) | Notes |
-|-----------------|----------------|-------|
-| `decode_aadhaar_qr_payload()` | `lib/aadhaar_qr/aadhaar_qr_decoder.dart` | Main entry |
-| `_parse_qr_bytes()` | same file | zlib/gzip + format dispatch |
-| `_parse_secure_qr_payload()` | `secure_qr_parser.dart` | Secure binary Aadhaar QR |
-| XML attribute parsing | `xml_qr_parser.dart` | Legacy XML QR |
-| Photo extraction helpers | `aadhaar_qr_utils.dart` | Base64 photo fields |
-| `decode_aadhaar_qr()` image pipeline | **Not ported** | Uses `flutter_zxing` + `mobile_scanner` instead |
-| MongoDB auth | **Removed** | Not needed offline |
-| UIDAI RSA `e_signed` verify | **Not ported yet** | Fields decode; `e_signed` stays false |
+---
 
-**~500 lines of Dart** replace the payload parsing portion of `qr_decode.py`. The heavy OpenCV/YOLO image pipeline stays replaced by native QR scanners.
+## 🛠️ Implementation Details
 
-## Run
+### 1. Offline Biometric JPEG 2000 Transcoding (Native Platform Bridge)
+Flutter does not support rendering `.jp2` (JPEG 2000) formats natively. To solve this, the app uses a native Android dependency and a MethodChannel bridge:
+- **Native Dependency**: Added `dev.keiji.jp2:jp2-android` to compile OpenJPEG libraries locally.
+- **Native Controller ([MainActivity.kt](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/android/app/src/main/kotlin/com/indiap2p/aadhaar_qr_scanner/MainActivity.kt))**: Hooks into the engine's initialization to catch decoding requests, transcode the image buffer to standard PNG bytes, and feed it back to Flutter.
+- **Stateful UI Renderer ([qr_details_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/qr_details_screen.dart))**: Resolves JP2 decoding asynchronously inside `initState()`, showing a progressive loader until the native C++ engine returns the renderable PNG format.
+
+### 2. Output Formatting & Null Fallbacks
+- For missing fields inside the QR payload (e.g. `id_number` or partial addresses), the app falls back to rendering a dash (`-`) in place of null values.
+- If the scanned data contains quality warnings, an amber alert banner is placed at the top of the card.
+
+### 3. Smart Developer Console Logs
+- The app pretty-prints raw decoded results in a structured format in the console.
+- Large base64 strings (`photo_base64` and `photo_preview_base64`) are automatically truncated inside logging maps and split into chunk-safe streams to prevent Android Logcat from clipping the outputs.
+
+---
+
+## 🚀 How to Run
+
+Because this app utilizes native dependencies and MethodChannel configurations, you must run a full native rebuild rather than a Hot Reload.
 
 ```bash
-cd aadhaar_qr_scanner
+# 1. Clear caches
+flutter clean
+
+# 2. Resolve dependencies
 flutter pub get
+
+# 3. Compile and Run on physical device
 flutter run
 ```
 
-## Usage
+---
 
-1. **Scan Live** — point camera at Aadhaar QR
-2. **Gallery** — pick a cropped QR image, then **Decode Selected Image**
+## 📂 Key Source Files
 
-No API URL or API key needed.
-
-## Tests
-
-```bash
-flutter test
-```
-
-## Limitations vs Python API
-
-- Blurry/damaged QR images may fail where the Python server’s exhaustive OpenCV pipeline succeeds
-- `e_signed` cryptographic verification is not implemented on-device yet
-- Secure QR returns `reference_id`, not full Aadhaar number (same as Python)
+- **Live Scanner UI**: [decode_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/decode_screen.dart)
+- **Detailed Viewer Screen**: [qr_details_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/qr_details_screen.dart)
+- **Aadhaar QR Parser**: [aadhaar_qr_decoder.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/aadhaar_qr/aadhaar_qr_decoder.dart)
+- **Native Transcoder Bridge**: [MainActivity.kt](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/android/app/src/main/kotlin/com/indiap2p/aadhaar_qr_scanner/MainActivity.kt)
+- **MethodChannel Service**: [jp2_decoder_service.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/services/jp2_decoder_service.dart)
