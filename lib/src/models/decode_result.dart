@@ -1,4 +1,6 @@
-﻿/// Parsed Aadhaar QR fields (mirrors Python qr_decode output shape).
+﻿import '../decoder/aadhaar_qr_utils.dart';
+
+/// Parsed Aadhaar QR fields (mirrors Python qr_decode output shape).
 class AadhaarQrData {
   const AadhaarQrData({
     this.name,
@@ -33,13 +35,17 @@ class AadhaarQrData {
   factory AadhaarQrData.fromMap(Map<String, dynamic> map) {
     final photoB64 = map['photo_base64'] as String?;
     final previewB64 = map['photo_preview_base64'] as String?;
+    final referenceId = map['reference_id'] as String?;
+    final idNumber = (map['id_number'] as String?)?.trim();
     return AadhaarQrData(
       name: map['name'] as String?,
       dob: map['dob'] as String?,
       gender: map['gender'] as String?,
       address: map['address'] as String?,
-      idNumber: map['id_number'] as String?,
-      referenceId: map['reference_id'] as String?,
+      idNumber: (idNumber != null && idNumber.isNotEmpty)
+          ? idNumber
+          : maskAadhaarFromReferenceId(referenceId),
+      referenceId: referenceId,
       pin: map['pin'] as String?,
       eSigned: map['e_signed'] == true,
       photoPresent: (photoB64?.isNotEmpty ?? false) || (previewB64?.isNotEmpty ?? false),

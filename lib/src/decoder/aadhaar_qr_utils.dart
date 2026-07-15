@@ -1,6 +1,13 @@
 ﻿import 'dart:convert';
 import 'dart:typed_data';
 
+/// UIDAI secure QR reference IDs start with the last 4 digits of the Aadhaar number.
+String? maskAadhaarFromReferenceId(String? referenceId) {
+  final digits = referenceId?.replaceAll(RegExp(r'\D'), '') ?? '';
+  if (digits.length < 4) return null;
+  return 'XXXX XXXX ${digits.substring(0, 4)}';
+}
+
 Uint8List bigIntToBytesBE(BigInt value) {
   if (value == BigInt.zero) {
     return Uint8List(0);

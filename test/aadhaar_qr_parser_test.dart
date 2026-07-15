@@ -66,4 +66,14 @@ void main() {
     expect(result.idNumber, 'XXXX XXXX 1234');
     expect(result.pin, '110001');
   });
+
+  test('API map derives masked Aadhaar from reference id', () {
+    final result = AadhaarQrData.fromMap({
+      'name': 'ABHIJEET SAHU',
+      'reference_id': '594120260424000821548',
+    });
+
+    expect(result.idNumber, 'XXXX XXXX 5941');
+    expect(result.referenceId, '594120260424000821548');
+  });
 }

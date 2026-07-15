@@ -9,13 +9,6 @@ final _secureRefRe = RegExp(r'^\d{12,24}$');
 final _pinRe = RegExp(r'^([1-9]\d{5})$');
 const _secureGenders = {'M', 'F', 'T', 'MALE', 'FEMALE', 'TRANSGENDER'};
 
-/// UIDAI secure QR reference IDs start with the last 4 digits of the Aadhaar number.
-String? maskAadhaarFromReferenceId(String? referenceId) {
-  final digits = referenceId?.replaceAll(RegExp(r'\D'), '') ?? '';
-  if (digits.length < 4) return null;
-  return 'XXXX XXXX ${digits.substring(0, 4)}';
-}
-
 String cleanSecureQrText(String value) {
   value = value.replaceAll('\x00', ' ').replaceAll('\ufeff', ' ');
   value = value.split('').where((ch) {
