@@ -8,6 +8,11 @@ void main() {
 class AadhaarQrScannerExampleApp extends StatelessWidget {
   const AadhaarQrScannerExampleApp({super.key});
 
+  static const _apiConfig = AadhaarQrApiConfig(
+    baseUrl: 'https://aadhaar-qr-reader.indiap2p.com',
+    apiKey: '22609608-0012-45e0-b624-16fc6882e210',
+  );
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,7 +21,7 @@ class AadhaarQrScannerExampleApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const DecodeScreen(),
+      home: const DecodeScreen(apiConfig: _apiConfig),
     );
   }
 }

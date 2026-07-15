@@ -6,7 +6,12 @@ void main() {
   testWidgets('Decode screen loads with scanner guidance', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: DecodeScreen(),
+        home: DecodeScreen(
+          apiConfig: AadhaarQrApiConfig(
+            baseUrl: 'http://127.0.0.1:8001',
+            apiKey: 'test-api-key',
+          ),
+        ),
       ),
     );
     expect(find.text('Aadhaar QR Scanner'), findsOneWidget);

@@ -1,94 +1,99 @@
 ﻿import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../config/aadhaar_qr_api_config.dart';
 import '../models/decode_result.dart';
-import '../services/aadhaar_qr_local_decoder.dart';
+import '../services/aadhaar_qr_api_decoder.dart';
 import '../widgets/qr_scanner_widget.dart';
 import 'qr_details_screen.dart';
 
 class DecodeScreen extends StatefulWidget {
-  const DecodeScreen({super.key});
+  const DecodeScreen({
+    super.key,
+    required this.apiConfig,
+  });
+
+  final AadhaarQrApiConfig apiConfig;
 
   @override
   State<DecodeScreen> createState() => _DecodeScreenState();
 }
 
 class _DecodeScreenState extends State<DecodeScreen> {
-  final _cameraController = MobileScannerController(
+  late final MobileScannerController _cameraController = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [BarcodeFormat.qrCode],
+    returnImage: true,
   );
-  late final AadhaarQrLocalDecoder _decoder = AadhaarQrLocalDecoder();
+  late final AadhaarQrApiDecoder _decoder = AadhaarQrApiDecoder(widget.apiConfig);
 
   bool _loading = false;
   String? _error;
 
   Future<void> _onBarcode(BarcodeCapture capture) async {
-    if (_loading) return;
+    if (_loading || capture.barcodes.isEmpty) return;
 
-    for (final barcode in capture.barcodes) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final imageBytes = capture.image;
+      if (imageBytes == null || imageBytes.isEmpty) {
+        throw DecodeException('Failed to capture scan image.');
+      }
+
+      final result = await _decoder.decodeImage(imageBytes: imageBytes);
 
       try {
-        final result = _decoder.decodePayload(
-          rawBytes: barcode.rawBytes == null ? null : Uint8List.fromList(barcode.rawBytes!),
-          rawText: barcode.rawValue,
-        );
-
-        try {
-          final logData = {
-            'name': result.name,
-            'dob': result.dob,
-            'gender': result.gender,
-            'address': result.address,
-            'id_number': result.idNumber,
-            'reference_id': result.referenceId,
-            'pin': result.pin,
-            'e_signed': result.eSigned,
-            'photo_present': result.photoPresent,
-            'photo_preview_base64': result.photoPreviewBase64 != null ? '<BASE64_PREVIEW_DATA_TRUNCATED>' : null,
-            'photo_base64': result.photoBase64 != null ? '<BASE64_IMAGE_DATA_TRUNCATED>' : null,
-          };
-          debugPrint("============Photo Preview:==============");
-          _printLongString(result.photoPreviewBase64);
-          debugPrint("========================================");
-          debugPrint('=== Aadhaar QR Local Decode Success ===');
-          debugPrint(const JsonEncoder.withIndent('  ').convert(logData));
-          debugPrint('=======================================');
-        } catch (e) {
-          debugPrint('Aadhaar QR Local Decode Success: Name: ${result.name}, DOB: ${result.dob}');
-        }
-        await _cameraController.stop();
-        if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => QrDetailsScreen(data: result),
-          ),
-        );
-        if (!mounted) return;
-        await _cameraController.start();
-        return;
-      } on DecodeException catch (e) {
-        if (!mounted) return;
-        setState(() => _error = e.message);
+        final logData = {
+          'name': result.name,
+          'dob': result.dob,
+          'gender': result.gender,
+          'address': result.address,
+          'id_number': result.idNumber,
+          'reference_id': result.referenceId,
+          'pin': result.pin,
+          'e_signed': result.eSigned,
+          'photo_present': result.photoPresent,
+          'photo_preview_base64': result.photoPreviewBase64 != null ? '<BASE64_PREVIEW_DATA_TRUNCATED>' : null,
+          'photo_base64': result.photoBase64 != null ? '<BASE64_IMAGE_DATA_TRUNCATED>' : null,
+        };
+        debugPrint('============Photo Preview:==============');
+        _printLongString(result.photoPreviewBase64);
+        debugPrint('========================================');
+        debugPrint('=== Aadhaar QR API Decode Success ===');
+        debugPrint(const JsonEncoder.withIndent('  ').convert(logData));
+        debugPrint('=====================================');
       } catch (e) {
-        if (!mounted) return;
-        setState(() => _error = e.toString());
-      } finally {
-        if (mounted) setState(() => _loading = false);
+        debugPrint('Aadhaar QR API Decode Success: Name: ${result.name}, DOB: ${result.dob}');
       }
+      await _cameraController.stop();
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => QrDetailsScreen(data: result),
+        ),
+      );
+      if (!mounted) return;
+      await _cameraController.start();
+    } on DecodeException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   void _printLongString(String? text) {
     if (text == null) return;
-    final int chunkSize = 800;
+    const chunkSize = 800;
     for (int i = 0; i < text.length; i += chunkSize) {
       final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;
       debugPrint(text.substring(i, end));
@@ -97,6 +102,7 @@ class _DecodeScreenState extends State<DecodeScreen> {
 
   @override
   void dispose() {
+    _decoder.close();
     _cameraController.dispose();
     super.dispose();
   }
@@ -118,7 +124,7 @@ class _DecodeScreenState extends State<DecodeScreen> {
             children: [
               Text(
                 'Scan the Aadhaar QR code using your camera. '
-                'Decoding happens entirely on your device.',
+                'The captured image is sent to the decode API for processing.',
                 style: TextStyle(
                   color: colorScheme.onSurface.withValues(alpha: 0.8),
                   height: 1.4,
