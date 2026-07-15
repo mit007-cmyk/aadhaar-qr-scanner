@@ -63,6 +63,7 @@ void main() {
     expect(result, isNotNull);
     expect(result!.name, 'Alice');
     expect(result.referenceId, '123456789012345678901');
+    expect(result.idNumber, 'XXXX XXXX 1234');
     expect(result.pin, '110001');
   });
 }
