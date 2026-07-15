@@ -63,7 +63,7 @@ class QrScannerWidget extends StatelessWidget {
                             const CircularProgressIndicator(color: Colors.white),
                             const SizedBox(height: 12),
                             Text(
-                              'Decoding QRΓÇª',
+                              'Decoding QR Code...',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.95),
                                 fontWeight: FontWeight.w500,
