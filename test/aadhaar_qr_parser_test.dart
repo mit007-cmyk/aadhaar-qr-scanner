@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:aadhaar_qr_scanner/aadhaar_qr/aadhaar_qr_decoder.dart';
+import 'package:aadhaar_qr_scanner/aadhaar_qr_scanner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,78 +1,201 @@
-# Aadhaar QR Scanner (On-Device Offline)
+# aadhaar_qr_scanner
 
-A Flutter application designed to scan and decode both **Legacy (XML)** and **Modern (Secure Binary)** Aadhaar QR codes entirely on-device offline. No Python server or network requests are required to read, parse, and verify the biometric data.
+[![Pub Version](https://img.shields.io/pub/v/aadhaar_qr_scanner.svg)](https://pub.dev/packages/aadhaar_qr_scanner)
 
----
+A Flutter plugin for scanning and decoding **Legacy (XML)** and **Modern (Secure Binary)** Aadhaar QR codes entirely on-device. No backend API or Python server is required — QR detection uses Google ML Kit, payload parsing runs in pure Dart, and biometric photos are decoded natively on Android.
 
-## 📱 Features
+## Features
 
-- **On-Device Live Scanning**: Uses **Google ML Kit Barcode API** (`mobile_scanner`) to capture raw binary payloads directly from live camera frames.
-- **Decompression & Parsing**: Pure Dart implementation (`lib/aadhaar_qr/`) to handle raw bytes decompression (Zlib/GZip) and binary segment parsing.
-- **Native JPEG 2000 Decryption & Transcoding**: Seamlessly decodes heavily compressed biometric photos (`image/jp2`) using a native Kotlin/C++ MethodChannel bridge.
-- **Clean Details Presentation**: Displays card-based details with dedicated verification badges (e-Signature status), and auto-fallbacks (`-`) for missing or null fields.
-- **Console Log Output**: Outputs formatted, pretty-printed JSON logs in the debug terminal with truncated base64 image data to avoid cluttering.
+- Live Aadhaar QR scanning via Google ML Kit (`mobile_scanner`)
+- On-device parsing of legacy XML and secure binary Aadhaar QR payloads
+- Native JPEG 2000 (JP2) biometric photo decoding on Android
+- Ready-made UI: `DecodeScreen`, `QrDetailsScreen`, and `QrScannerWidget`
+- Centered scan-frame overlay with user guidance for accurate scanning
 
----
+See the [example](example/README.md) app for a runnable demo.
 
-## ⚙️ Architecture & Technical Flow
+## Platform Support
 
+| Android | iOS | macOS | Web | Linux | Windows |
+|---------|-----|-------|-----|-------|---------|
+| ✔       | ✔*  | ✔*    | ✔*  | :x:   | :x:     |
+
+\* Scanning and Dart-side QR parsing are available wherever `mobile_scanner` is supported. The native JP2 photo decoder plugin is **Android-only**.
+
+### Features Supported
+
+See the [example](example/) app for detailed implementation.
+
+| Feature              | Android            | iOS                | macOS              | Web |
+|----------------------|--------------------|--------------------|--------------------|-----|
+| Live QR scanning     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| XML QR parsing       | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| Secure binary parsing| :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| JP2 photo decoding   | :heavy_check_mark: | :x:                | :x:                | :x: |
+| Built-in UI screens  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+
+## Installation
+
+Add the dependency in your `pubspec.yaml` file:
+
+```yaml
+dependencies:
+  aadhaar_qr_scanner: ^1.0.0
 ```
-[Live Camera Frame]
-       │ (Google ML Kit Native Thread)
-       ▼
-[Raw Byte Stream (Compressed Aadhaar Data)]
-       │ (Dart zlib/gzip Decompressor)
-       ▼
-[Parsed Aadhaar Data Model] 
-       │ (MIME Check: image/jp2)
-       ▼ (MethodChannel: /jp2_decoder)
-[Native Android OpenJPEG Engine (Kotlin/C++)] ──► Converts JP2 to PNG
-       │
-       ▼ (PNG Bytes)
-[Flutter UI Widget (Image.memory)]
-```
 
----
-
-## 🛠️ Implementation Details
-
-### 1. Offline Biometric JPEG 2000 Transcoding (Native Platform Bridge)
-Flutter does not support rendering `.jp2` (JPEG 2000) formats natively. To solve this, the app uses a native Android dependency and a MethodChannel bridge:
-- **Native Dependency**: Added `dev.keiji.jp2:jp2-android` to compile OpenJPEG libraries locally.
-- **Native Controller ([MainActivity.kt](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/android/app/src/main/kotlin/com/indiap2p/aadhaar_qr_scanner/MainActivity.kt))**: Hooks into the engine's initialization to catch decoding requests, transcode the image buffer to standard PNG bytes, and feed it back to Flutter.
-- **Stateful UI Renderer ([qr_details_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/qr_details_screen.dart))**: Resolves JP2 decoding asynchronously inside `initState()`, showing a progressive loader until the native C++ engine returns the renderable PNG format.
-
-### 2. Output Formatting & Null Fallbacks
-- For missing fields inside the QR payload (e.g. `id_number` or partial addresses), the app falls back to rendering a dash (`-`) in place of null values.
-- If the scanned data contains quality warnings, an amber alert banner is placed at the top of the card.
-
-### 3. Smart Developer Console Logs
-- The app pretty-prints raw decoded results in a structured format in the console.
-- Large base64 strings (`photo_base64` and `photo_preview_base64`) are automatically truncated inside logging maps and split into chunk-safe streams to prevent Android Logcat from clipping the outputs.
-
----
-
-## 🚀 How to Run
-
-Because this app utilizes native dependencies and MethodChannel configurations, you must run a full native rebuild rather than a Hot Reload.
+Then run:
 
 ```bash
-# 1. Clear caches
-flutter clean
-
-# 2. Resolve dependencies
 flutter pub get
+```
 
-# 3. Compile and Run on physical device
+## Configuration
+
+### Android
+
+Add the camera permission to your `AndroidManifest.xml` (located in `<project root>/android/app/src/main/AndroidManifest.xml`):
+
+```xml
+<uses-permission android:name="android.permission.CAMERA"/>
+```
+
+The JP2 decoder uses the bundled `jp2-android` native library and is registered automatically when you add this package as a dependency.
+
+### iOS
+
+Since the scanner needs camera access, add the following key to your `Info.plist` file (located in `<project root>/ios/Runner/Info.plist`):
+
+`NSCameraUsageDescription` — describe why your app needs access to the camera. This is called **Privacy - Camera Usage Description** in the visual editor.
+
+Example:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>This app needs camera access to scan Aadhaar QR codes</string>
+```
+
+### macOS
+
+Ensure that you grant camera permission in Xcode → Signing & Capabilities.
+
+## Usage
+
+### Simple
+
+Import the package with `package:aadhaar_qr_scanner/aadhaar_qr_scanner.dart` and use the built-in scanner screen:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:aadhaar_qr_scanner/aadhaar_qr_scanner.dart';
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: DecodeScreen(),
+    );
+  }
+}
+```
+
+`DecodeScreen` opens the live camera scanner, decodes the Aadhaar QR on-device, and navigates to `QrDetailsScreen` with the parsed result.
+
+### Advanced
+
+#### Decode a raw QR payload
+
+If you already have QR bytes from your own scanner, decode them directly:
+
+```dart
+import 'dart:typed_data';
+import 'package:aadhaar_qr_scanner/aadhaar_qr_scanner.dart';
+
+final decoder = AadhaarQrLocalDecoder();
+
+try {
+  final data = decoder.decodePayload(rawBytes: Uint8List.fromList(qrBytes));
+  print(data.name);
+  print(data.dob);
+  print(data.idNumber);
+} on DecodeException catch (e) {
+  print('Decode failed: $e');
+}
+```
+
+#### Use the scanner widget in your own screen
+
+For custom layouts, use `QrScannerWidget` with your own `MobileScannerController`:
+
+```dart
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:aadhaar_qr_scanner/aadhaar_qr_scanner.dart';
+
+final controller = MobileScannerController(
+  detectionSpeed: DetectionSpeed.noDuplicates,
+  formats: const [BarcodeFormat.qrCode],
+);
+
+QrScannerWidget(
+  controller: controller,
+  onDetect: (capture) {
+    for (final barcode in capture.barcodes) {
+      // Handle barcode.rawBytes / barcode.rawValue
+    }
+  },
+);
+```
+
+#### Show decoded details
+
+```dart
+Navigator.of(context).push(
+  MaterialPageRoute(
+    builder: (_) => QrDetailsScreen(data: aadhaarData),
+  ),
+);
+```
+
+## Example
+
+Run the bundled example app:
+
+```bash
+cd example
+flutter pub get
 flutter run
 ```
 
----
+## Known Limitations
 
-## 📂 Key Source Files
+### JP2 biometric photos (Android only)
 
-- **Live Scanner UI**: [decode_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/decode_screen.dart)
-- **Detailed Viewer Screen**: [qr_details_screen.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/screens/qr_details_screen.dart)
-- **Aadhaar QR Parser**: [aadhaar_qr_decoder.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/aadhaar_qr/aadhaar_qr_decoder.dart)
-- **Native Transcoder Bridge**: [MainActivity.kt](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/android/app/src/main/kotlin/com/indiap2p/aadhaar_qr_scanner/MainActivity.kt)
-- **MethodChannel Service**: [jp2_decoder_service.dart](file:///d:/Projects/india-p2p/aadhaar_qr_scanner/lib/services/jp2_decoder_service.dart)
+Aadhaar secure QR codes often store the holder's photo as **JPEG 2000 (`image/jp2`)**. Flutter cannot render JP2 natively, so this package provides an Android MethodChannel bridge (`Jp2DecoderService`) that transcodes JP2 to PNG.
+
+On iOS, macOS, and Web, QR field parsing still works, but JP2 photos will not be displayed unless you provide your own decoding pipeline.
+
+### `rawBytes` on iOS and macOS
+
+Aadhaar secure QR payloads rely on raw binary data. On iOS and macOS, `mobile_scanner` may return `null` for `rawBytes` in certain encoding modes. This package also accepts `rawText` and attempts numeric-string fallback decoding when applicable.
+
+For the most reliable results with secure binary Aadhaar QRs, use **Android**.
+
+## Project Structure
+
+```
+aadhaar_qr_scanner/
+├── lib/
+│   ├── aadhaar_qr_scanner.dart    # Public API barrel export
+│   └── src/                       # Private implementation
+├── android/                       # Native JP2 decoder plugin
+├── example/                       # Demo Flutter app
+├── test/                          # Package unit tests
+├── CHANGELOG.md
+├── LICENSE
+└── pubspec.yaml
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -1,15 +1,16 @@
 name: aadhaar_qr_scanner
-description: On-device Aadhaar QR decode (no Python API required).
-publish_to: 'none'
-version: 1.0.0+1
+description: On-device Aadhaar QR scanner and decoder for Flutter using Google ML Kit.
+version: 1.0.0
+repository: https://github.com/indiap2p/aadhaar_qr_scanner
+homepage: https://github.com/indiap2p/aadhaar_qr_scanner
 
 environment:
   sdk: ^3.10.1
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
   mobile_scanner: ^6.0.2
   xml: ^6.5.0
   archive: ^4.0.7
@@ -21,4 +22,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
-  uses-material-design: true
+  plugin:
+    platforms:
+      android:
+        package: com.indiap2p.aadhaar_qr_scanner
+        pluginClass: AadhaarQrScannerPlugin
